@@ -3,8 +3,8 @@
 
 type dex_storage = {
     entered: bool;
-    pairs_count : nat; // renamme to trip count
-    tokens : (nat, tokens_info) big_map; // tokens info
+    pairs_count : nat; (* renamme to trip count *)
+    tokens : (nat, tokens_info) big_map; (*tokens info*) 
     token_to_id : (token_pair, nat) big_map;
     pairs : (nat, pair_info) big_map;
     ledger : ((address * nat), account_info) big_map;
@@ -22,8 +22,8 @@ type tokens_info = {
     token_c_type : token_type;
 
 }
-type token_type = Fa12 | Fa2 ; // check if this is valid syntax
- 
+type token_type = Fa12 | Fa2 ; (*check if this is valid syntax*)
+
 type token_to_token_route_params is
 [@layout:comb]
 record [
@@ -67,4 +67,11 @@ type exchange_storage {
   counter : nat;
   token_list : (nat, token_identifier) big_map;
   token_to_exchange : (token_identifier, address) big_map;
+}
+
+type initialize_params = {
+    pair : tokens_info;
+    token_a_in : nat;
+    token_b_in : nat;
+    token_c_in : nat;
 }
