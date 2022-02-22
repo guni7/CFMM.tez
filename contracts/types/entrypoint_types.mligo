@@ -13,7 +13,14 @@ type dex_storage = {
     token_to_id : (token_pair, nat) big_map;
     pairs : (nat, pair_info) big_map;
     ledger : ((address * nat), account_info) big_map;
+
 }
 
-
-(*helper function implementation*)
+type token_to_token_route_params is
+  [@layout:comb]
+  record [
+    swaps                 : list(swap_slice_type); (* swap operations list*)
+    amount_in             : nat; (* amount of tokens to be exchanged *)
+    min_amount_out        : nat; (* min amount of tokens received to accept exchange *)
+    receiver              : address; (* tokens receiver *)
+  ]
