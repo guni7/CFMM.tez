@@ -58,6 +58,12 @@ typings/
 .rts2_cache_cjs/
 .rts2_cache_es/
 .rts2_cache_umd/
+migrations/
+node_modules/
+test/
+tezos_example/
+tmp/
+build/
 
 # Optional REPL history
 .node_repl_history

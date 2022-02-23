@@ -1,0 +1,23 @@
+{
+  "name": "cfmm.tez",
+  "version": "1.0.0",
+  "description": "Automatic Market Maker Flat curve implementation for 3 tokens on Tezos",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/guni7/CFMM.tez.git"
+  },
+  "author": "ManchurianHotdog",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/guni7/CFMM.tez/issues"
+  },
+  "homepage": "https://github.com/guni7/CFMM.tez#readme",
+  "dependencies": {
+    "@truffle/hdwallet-provider": "^2.0.3",
+    "web3": "^1.7.0"
+  }
+}
