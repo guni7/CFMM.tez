@@ -9,7 +9,7 @@ var token_3 = 1000n;
 const token_pool = 3000n;
 
 let utility_function = function(x:bigint, y:bigint, z:bigint):bigint{
-    return ((x+y+z)/3n - (x*y*z)**(1n/3n)); 
+    return ( (x*y*z) - (x+y+z)/3n); 
 }
 
 let price = function(amount_token1 : bigint, amount_token2 : bigint, amount_token3: bigint)
