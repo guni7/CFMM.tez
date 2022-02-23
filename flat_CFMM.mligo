@@ -11,7 +11,7 @@
 type add_liquidity = {
     owner: address;
     minLiqMinted: nat;
-    maxTokenDeposited: nat;
+    maxTokensDeposited: nat;
     cashDeposited: nat;
     deadline: timestamp;
 }
@@ -20,7 +20,7 @@ type remove_liquidity = {
     to_ : address;
     liqBurned: nat;
     minCashWithdrawn: nat;
-    minTokenWithdrawn: nat;
+    minTokensWithdrawn: nat;
     deadline: timestamp;
 }
 
@@ -33,7 +33,7 @@ type cash_to_token = {
 
 type token_to_cash = {
     to_: address;
-    tokenSold: nat;
+    tokensSold: nat;
     minCashBought: nat;
     deadline: timestamp;
 }
@@ -85,27 +85,26 @@ type storage = {
 
 type result = operation list*storage
 
-//for FA2 token
 type token_id = nat
 type balance_of = ((address*token_id) list*((((address*nat)*nat) list) contract))
-(* FA1.2 *)
+
 type get_balance = address*(nat contract)
 
 #if TOKEN_IS_FA2
 type token_contract_transfer = (address*(address*(token_id*nat)) list) list
 #else
-(*  FA1.2 *)
+
 type token_contract_transfer = address*(address*nat)
 #endif
 
 #if CASH_IS_FA2
 type cash_contract_transfer = (address*(address*(token_id*nat)) list) list
 #else
-(* FA12 *)
+
 type cash_contract_transfer = address*(address*nat)
 #endif
 
-(* custom entrypoint for LQT FA1.2 *)
+
 type mintOrBurn = { 
     quantity : int ;
     target : address 
@@ -118,16 +117,16 @@ type mintOrBurn = {
 [@inline] let error_PENDING_POOL_UPDATES_MUST_BE_ZERO       = 2n
 [@inline] let error_THE_CURRENT_TIME_MUST_BE_LESS_THAN_THE_DEADLINE = 3n
 [@inline] let error_MAX_TOKENS_DEPOSITED_MUST_BE_GREATER_THAN_OR_EQUAL_TO_TOKENS_DEPOSITED = 4n
-[@inline] let error_LQT_MINTED_MUST_BE_GREATER_THAN_MIN_LQT_MINTED = 5n
+[@inline] let error_LIQ_MINTED_MUST_BE_GREATER_THAN_MIN_LIQ_MINTED = 5n
 (* 6n *)
 [@inline] let error_ONLY_NEW_MANAGER_CAN_ACCEPT = 7n
 [@inline] let error_CASH_BOUGHT_MUST_BE_GREATER_THAN_OR_EQUAL_TO_MIN_CASH_BOUGHT = 8n
 [@inline] let error_INVALID_TO_ADDRESS = 9n
 [@inline] let error_AMOUNT_MUST_BE_ZERO = 10n
 [@inline] let error_THE_AMOUNT_OF_CASH_WITHDRAWN_MUST_BE_GREATER_THAN_OR_EQUAL_TO_MIN_CASH_WITHDRAWN = 11n
-[@inline] let error_LQT_CONTRACT_MUST_HAVE_A_MINT_OR_BURN_ENTRYPOINT = 12n
+[@inline] let error_LIQ_CONTRACT_MUST_HAVE_A_MINT_OR_BURN_ENTRYPOINT = 12n
 [@inline] let error_THE_AMOUNT_OF_TOKENS_WITHDRAWN_MUST_BE_GREATER_THAN_OR_EQUAL_TO_MIN_TOKENS_WITHDRAWN = 13n
-[@inline] let error_CANNOT_BURN_MORE_THAN_THE_TOTAL_AMOUNT_OF_LQT = 14n
+[@inline] let error_CANNOT_BURN_MORE_THAN_THE_TOTAL_AMOUNT_OF_LIQ = 14n
 [@inline] let error_TOKEN_POOL_MINUS_TOKENS_WITHDRAWN_IS_NEGATIVE = 15n
 [@inline] let error_CASH_POOL_MINUS_CASH_WITHDRAWN_IS_NEGATIVE = 16n
 [@inline] let error_CASH_POOL_MINUS_CASH_BOUGHT_IS_NEGATIVE = 17n
@@ -136,7 +135,7 @@ type mintOrBurn = {
 [@inline] let error_ONLY_MANAGER_CAN_SET_BAKER = 20n
 [@inline] let error_ONLY_MANAGER_CAN_SET_MANAGER = 21n
 [@inline] let error_BAKER_PERMANENTLY_FROZEN = 22n
-[@inline] let error_LQT_ADDRESS_ALREADY_SET = 24n
+[@inline] let error_LIQ_ADDRESS_ALREADY_SET = 24n
 [@inline] let error_CALL_NOT_FROM_AN_IMPLICIT_ACCOUNT = 25n
 (* 26n *)
 (* 27n *)
@@ -160,25 +159,25 @@ type mintOrBurn = {
 
 //address
 
-let null_address = ("SOME ADDRESS" : address)
+let null_address = ("tz2XPds8586EYPMzuDALRXN2Zrfz2VdBGupN" : address)
 
 let mutez_to_natural (a:tez) : nat = a/1mutez
 let natural_to_mutez (a:nat) : tez = a*1mutez
 let is_a_nat (i: int) : nat option = Michelson.is_nat i
 
-let ceildiv (numerator : nat) (denominator : nat) : nat = abs ((- numerator) / (int denominator))
+let ceildiv (numerator : nat) (denominator : nat) : nat =  abs((- numerator) / (int denominator))
 
 let mint_or_burn (storage: storage) (target: address) (quantity: int): operation =
 
     let liq_admin : mintOrBurn contract =
 
      match (Tezos.get_entrypoint_opt "%mintOrBurn" storage.liqAddress :  mintOrBurn contract option) with
-    | None -> (failwith error_LQT_CONTRACT_MUST_HAVE_A_MINT_OR_BURN_ENTRYPOINT : mintOrBurn contract)
+    | None -> (failwith error_LIQ_CONTRACT_MUST_HAVE_A_MINT_OR_BURN_ENTRYPOINT : mintOrBurn contract)
     | Some contract -> contract in
     Tezos.transaction {quantity = quantity ; target = target} 0mutez liq_admin
 
 
-let token_tranfer (storage: storage) (from: address) (to_: address) (token_amount: nat): operation =
+let token_transfer (storage: storage) (from: address) (to_: address) (token_amount: nat): operation =
 
     let token_contract: token_contract_transfer contract =
     match (Tezos.get_entrypoint_opt "%transfer" storage.tokenAddress : token_contract_transfer contract option) with
@@ -190,7 +189,7 @@ let token_tranfer (storage: storage) (from: address) (to_: address) (token_amoun
     Tezos.transaction (from, (to_, token_amount)) 0mutez token_contract
 #endif
 
-let cash_tranfer (storage: storage) (from: address) (to_: address) (cash_amount: nat): operation =
+let cash_transfer (storage: storage) (from: address) (to_: address) (cash_amount: nat): operation =
 
     let cash_contract: cash_contract_transfer contract =
      match (Tezos.get_entrypoint_opt "%transfer" storage.cashAddress : cash_contract_transfer contract option) with
@@ -205,12 +204,11 @@ let cash_tranfer (storage: storage) (from: address) (to_: address) (cash_amount:
 let add_liquidity (param: add_liquidity) (storage: storage) : result =
 
     let {
-        owner = owner;
-        minLiqMinted = minLiqMinted;
-        maxTokensDeposited = maxTokensDeposited;
         cashDeposited = cashDeposited;
-
-        deadline = dealine
+        deadline = deadline;
+        maxTokensDeposited = maxTokensDeposited;
+        minLiqMinted = minLiqMinted;
+        owner = owner;
     } = param in 
     if storage.pendingPoolUpdates > 0n then
         (failwith error_PENDING_POOL_UPDATES_MUST_BE_ZERO : result)
@@ -219,23 +217,23 @@ let add_liquidity (param: add_liquidity) (storage: storage) : result =
     else
         let cashPool   : nat = storage.cashPool in
         let liq_minted : nat = cashDeposited * storage.liqTotal / cashPool in
-        let tokens_deposited : nat = ceildiv (cacashDeposited * storage.tokenPool) cashPool in
+        let tokens_deposited : nat = ceildiv (cashDeposited * storage.tokenPool) cashPool in
 
         if tokens_deposited > maxTokensDeposited then
             (failwith error_MAX_TOKENS_DEPOSITED_MUST_BE_GREATER_THAN_OR_EQUAL_TO_TOKENS_DEPOSITED : result)
-        else if lqt_minted < minLqtMinted then
-            (failwith error_LQT_MINTED_MUST_BE_GREATER_THAN_MIN_LQT_MINTED : result)
+        else if liq_minted < minLiqMinted then
+            (failwith error_LIQ_MINTED_MUST_BE_GREATER_THAN_MIN_LIQ_MINTED : result)
         else
             let storage = {storage with
                 liqTotal  = storage.liqTotal + liq_minted ;
                 tokenPool = storage.tokenPool + tokens_deposited ;
                 cashPool  = storage.cashPool + cashDeposited} in
 
-            (* send tokens from sender to self *)
+       
             let op_token = token_transfer storage Tezos.sender Tezos.self_address tokens_deposited in
-            (* send cash from sender to self *)
+        
             let op_cash = cash_transfer storage Tezos.sender Tezos.self_address cashDeposited in
-            (* mint lqt tokens for them *)
+          
             let op_liq = mint_or_burn storage owner (int liq_minted) in
 
             ([op_token;
@@ -271,7 +269,7 @@ let remove_liquidity(param: remove_liquidity) (storage: storage) : result =
             
             let new_liqTotal = match (is_a_nat ( storage.liqTotal - liqBurned)) with
                 
-                | None -> (failwith error_CANNOT_BURN_MORE_THAN_THE_TOTAL_AMOUNT_OF_LQT : nat)
+                | None -> (failwith error_CANNOT_BURN_MORE_THAN_THE_TOTAL_AMOUNT_OF_LIQ : nat)
                 | Some n -> n in
             
             let new_tokenPool = match is_a_nat (storage.tokenPool - tokens_withdrawn) with
@@ -288,25 +286,16 @@ let remove_liquidity(param: remove_liquidity) (storage: storage) : result =
         end
     end
 
+// int recursion(int i, int target) { if(i == target) return; recursion(i+1, target)}
+let util (x: nat) (y: nat) (z:nat) : nat =
+    let plus = (x + y +z)/3 in
+    let mult = x*y*z in 
+    
+    abs((mult - plus))
 
 
-let util (x: nat) (y: nat) (z: nat) : nat  =
-    let plus = x + y +z in
+type newton_param = {x: nat; y:nat; z:nat; dx: nat; dy:nat; dz: nat; u:nat; n: int}
 
-    let res: int
-    res = 1
-
-    while(res*res*res < x*y*z)
-    {
-        res = res + 1
-    }
-
-    let multiply = res in 
-
-    let minus = plus - multiply in
-
-
-    abs(minus)
 
 
 let tokensBought (cashPool: nat) (tokenPool: nat) (cashSold:nat) : nat =
@@ -317,7 +306,7 @@ let tokensBought (cashPool: nat) (tokenPool: nat) (cashSold:nat) : nat =
 
     let result = util x y z in
 
-    abs(result)
+    result
 
 let cashBought (cashPool: nat) (tokenPool: nat) (tokenSold: nat) : nat =
 
@@ -327,14 +316,15 @@ let cashBought (cashPool: nat) (tokenPool: nat) (tokenSold: nat) : nat =
 
     let result = util x y z in
 
-    abs(result)
+    result
 
 let cash_to_token (param: cash_to_token) (storage: storage) =
 
     let 
     {
         to_ = to_;
-        cashSold = cashSold;
+        minTokensBought = minTokensBought;
+        cashSold = cashSold;       
         deadline = deadline;
     } = param in
 
@@ -407,7 +397,7 @@ let set_liq_address (liqAddress: address) (storage: storage) : result =
     else if Tezos.amount > 0mutez then
         (failwith error_AMOUNT_MUST_BE_ZERO : result)
     else if storage.liqAddress <> null_address then
-        (failwith error_LQT_ADDRESS_ALREADY_SET : result)
+        (failwith error_LIQ_ADDRESS_ALREADY_SET : result)
     else
         (([] : operation list), {storage with liqAddress = liqAddress})
     
@@ -473,8 +463,8 @@ let update_token_pool_internal (pool_update : update_token_pool_internal) (stora
 #else
     let pool = update_fa12_pool_internal (pool_update) in
 #endif
-    let pendingPoolUpdates = abs (storage.pendingPoolUpdates - 1n) in
-    (([] : operation list), {storage with tokenPool = pool ; pendingPoolUpdates = pendingPoolUpdates})
+    let pendingPoolUpdates = abs(storage.pendingPoolUpdates - 1n) in
+    (([] : operation list), {storage with tokenPool = pool ; pendingPoolUpdates = (pendingPoolUpdates)})
 
 let update_cash_pool_internal (pool_update : update_cash_pool_internal) (storage : storage) : result =
     if (storage.pendingPoolUpdates = 0n or Tezos.sender <> storage.cashAddress) then
@@ -485,7 +475,7 @@ let update_cash_pool_internal (pool_update : update_cash_pool_internal) (storage
 #else
     let pool = update_fa12_pool_internal (pool_update) in
 #endif
-    let pendingPoolUpdates = abs (storage.pendingPoolUpdates - 1) in
+    let pendingPoolUpdates = abs(storage.pendingPoolUpdates - 1n) in
     (([] : operation list), {storage with cashPool = pool ; pendingPoolUpdates = pendingPoolUpdates})
 
 
