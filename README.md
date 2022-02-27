@@ -18,7 +18,7 @@ truffle migrate
 
 <h1>Curve</h1>
 
-Live curve of the osputility curve - https://www.desmos.com/calculator/dcmnjltnc1 
+Live curve of the isoutility curve - https://www.desmos.com/calculator/dcmnjltnc1 
 
 ![Image of the plot](https://github.com/guni7/CFMM.tez/blob/main/curve1.png?raw=true)
 
