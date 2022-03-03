@@ -12,31 +12,66 @@ type add_liquidity = {
     owner: address;
     minLiqMinted: nat;
     maxTokensDeposited: nat;
-    cashDeposited: nat;
+    token_1_deposited: nat;
+    token_2_deposited: nat;
+    token_3_deposited: nat;
     deadline: timestamp;
 }
 
 type remove_liquidity = {
     to_ : address;
-    liqBurned: nat;
-    minCashWithdrawn: nat;
-    minTokensWithdrawn: nat;
+    //min_cash_withdrawn: nat;
+    token_1_withdrawn: nat;
+    token_2_withdrawn: nat;
+    token_3_withdrawn: nat;
+    deadline: timestamp;
+    
+}
+
+type token_1_to_2 = {
+    to_: address;
+    //token_2_bought: nat;
+    token_1_sold: nat;
+    deadline: timestamp;
+}
+type token_2_to_3 = {
+    to_: address;
+    //token_3_bought: nat;
+    token_2_sold: nat;
+    deadline: timestamp;
+}
+type token_1_to_3 = {
+    to_: address;
+    //token_2_bought: nat;
+    token_1_sold: nat;
     deadline: timestamp;
 }
 
-type cash_to_token = {
+type token_2_to_1 = {
     to_: address;
-    minTokensBought: nat;
-    cashSold: nat;
+    //token_2_bought: nat;
+    token_2_sold: nat;
+    deadline: timestamp;
+}
+type token_2_to_3 = {
+    to_: address;
+    //token_3_bought: nat;
+    token_2_sold: nat;
+    deadline: timestamp;
+}
+type token_3_to_2 = {
+    to_: address;
+    //token_2_bought: nat;
+    token_3_sold: nat;
+    deadline: timestamp;
+}
+type token_3_to_1 = {
+    to_: address;
+    //token_2_bought: nat;
+    token_3_sold: nat;
     deadline: timestamp;
 }
 
-type token_to_cash = {
-    to_: address;
-    tokensSold: nat;
-    minCashBought: nat;
-    deadline: timestamp;
-}
 
 //get balance
 type update_fa12_pool = nat
@@ -60,12 +95,17 @@ type entrypoint =
 | Default of unit
 | AddLiquidity    of add_liquidity
 | RemoveLiquidity of remove_liquidity
-| CashToToken     of cash_to_token
-| TokenToCash     of token_to_cash
+| Token1to2 of token_1_to_2
+| Token2to1 of token_2_to_1
+| Token2to3 of token_2_to_3
+| Token3to2 of token_3_to_2
+| Token1to3 of token_1_to_3
+| Token3to1 of token_3_to_1
 | UpdatePools     of unit
 | UpdateTokenPoolInternal of update_token_pool_internal
 | UpdateCashPoolInternal of update_cash_pool_internal
 | SetLiqAddress   of address
+
 
 type storage = {
     tokenPool: nat;
@@ -112,7 +152,7 @@ type mintOrBurn = {
 
 //ERRORS
 
-[@inline] let error_TOKEN_CONTRACT_MUST_HAVE_A_TRANSFER_ENTRYPOINT  = 0n
+[@inline] let error_TOKEN_CONTRACT_MUST_HAVE_A_TRANSFER_ENTRYPOINT  = 6n
 [@inline] let error_ASSERTION_VIOLATED_CASH_BOUGHT_SHOULD_BE_LESS_THAN_CASHPOOL = 1n
 [@inline] let error_PENDING_POOL_UPDATES_MUST_BE_ZERO       = 2n
 [@inline] let error_THE_CURRENT_TIME_MUST_BE_LESS_THAN_THE_DEADLINE = 3n
@@ -204,7 +244,9 @@ let cash_transfer (storage: storage) (from: address) (to_: address) (cash_amount
 let add_liquidity (param: add_liquidity) (storage: storage) : result =
 
     let {
-        cashDeposited = cashDeposited;
+        token_1_deposited = token_1_deposited;
+        token_2_deposited = token_2_deposited;
+        token_3_deposited = token_3_deposited;
         deadline = deadline;
         maxTokensDeposited = maxTokensDeposited;
         minLiqMinted = minLiqMinted;
@@ -215,6 +257,7 @@ let add_liquidity (param: add_liquidity) (storage: storage) : result =
     else if Tezos.now >= deadline then
         (failwith error_THE_CURRENT_TIME_MUST_BE_LESS_THAN_THE_DEADLINE : result)
     else
+        let cashDeposited: nat = token_1_deposited+token_2_deposited+token_3_deposited in
         let cashPool   : nat = storage.cashPool in
         let liq_minted : nat = cashDeposited * storage.liqTotal / cashPool in
         let tokens_deposited : nat = ceildiv (cashDeposited * storage.tokenPool) cashPool in
@@ -244,11 +287,14 @@ let add_liquidity (param: add_liquidity) (storage: storage) : result =
 let remove_liquidity(param: remove_liquidity) (storage: storage) : result =
 
     let {
-        to_ = to_;
-        liqBurned = liqBurned;
-        minCashWithdrawn = minCashWithdrawn;
-        minTokensWithdrawn = minTokensWithdrawn;
+        token_1_withdrawn = token_1_withdrawn;
+        token_2_withdrawn = token_2_withdrawn;
+        token_3_withdrawn = token_3_withdrawn;
         deadline = deadline;
+        //minCashWithdrawn = min_cash_withdrawn;
+        to_ = to_;
+        
+        
     } = param in
 
     if storage.pendingPoolUpdates > 0n then
@@ -258,14 +304,10 @@ let remove_liquidity(param: remove_liquidity) (storage: storage) : result =
     else if Tezos.amount > 0mutez then
         (failwith error_AMOUNT_MUST_BE_ZERO : result)
     else begin
+        let liqBurned : nat = (token_1_withdrawn + token_2_withdrawn + token_3_withdrawn) in
         let cash_withdrawn : nat = (liqBurned * storage.cashPool) / storage.liqTotal in
         let tokens_withdrawn : nat = (liqBurned * storage.tokenPool) / storage.liqTotal in
 
-        if cash_withdrawn < minCashWithdrawn then
-            (failwith error_THE_AMOUNT_OF_CASH_WITHDRAWN_MUST_BE_GREATER_THAN_OR_EQUAL_TO_MIN_CASH_WITHDRAWN : result)
-        else if tokens_withdrawn < minTokensWithdrawn  then
-            (failwith error_THE_AMOUNT_OF_TOKENS_WITHDRAWN_MUST_BE_GREATER_THAN_OR_EQUAL_TO_MIN_TOKENS_WITHDRAWN : result)
-        else begin
             
             let new_liqTotal = match (is_a_nat ( storage.liqTotal - liqBurned)) with
                 
@@ -283,7 +325,7 @@ let remove_liquidity(param: remove_liquidity) (storage: storage) : result =
             let op_cash = cash_transfer storage Tezos.self_address to_ cash_withdrawn in
             let storage = {storage with cashPool = new_cashPool ; liqTotal = new_liqTotal ; tokenPool = new_tokenPool} in
             ([op_liq; op_token; op_cash], storage)
-        end
+        
     end
 
 // int recursion(int i, int target) { if(i == target) return; recursion(i+1, target)}
@@ -318,13 +360,12 @@ let cashBought (cashPool: nat) (tokenPool: nat) (tokenSold: nat) : nat =
 
     result
 
-let cash_to_token (param: cash_to_token) (storage: storage) =
+let token_1_to_2 (param: token_1_to_2) (storage: storage) =
 
     let 
     {
         to_ = to_;
-        minTokensBought = minTokensBought;
-        cashSold = cashSold;       
+        token_1_sold = token_1_sold;      
         deadline = deadline;
     } = param in
 
@@ -335,17 +376,16 @@ let cash_to_token (param: cash_to_token) (storage: storage) =
     else begin
        
         let tokens_bought =
+            let cashSold = token_1_sold in
             (let bought = const_fee * (tokensBought storage.cashPool storage.tokenPool cashSold) / const_fee_denom in
-            if bought < minTokensBought then
-                (failwith error_TOKENS_BOUGHT_MUST_BE_GREATER_THAN_OR_EQUAL_TO_MIN_TOKENS_BOUGHT : nat)
-            else
+            
                 bought)
         in
         let new_tokenPool = (match is_nat (storage.tokenPool - tokens_bought) with
             | None -> (failwith error_TOKEN_POOL_MINUS_TOKENS_BOUGHT_IS_NEGATIVE : nat)
             | Some difference -> difference) in
 
-        
+        let cashSold = token_1_sold in 
         let storage = { storage with cashPool = storage.cashPool + cashSold ; tokenPool = new_tokenPool } in
       
         let op_cash = cash_transfer storage Tezos.sender Tezos.self_address cashSold in
@@ -356,13 +396,12 @@ let cash_to_token (param: cash_to_token) (storage: storage) =
             op_token], storage)
     end
 
-let token_to_cash (param: token_to_cash) (storage: storage) =
+let token_2_to_1 (param: token_2_to_1) (storage: storage) =
 
     let 
     {
         to_ = to_;
-        tokensSold = tokensSold;
-        minCashBought = minCashBought;
+        token_2_sold = token_2_sold;      
         deadline = deadline;
     } = param in
 
@@ -370,22 +409,169 @@ let token_to_cash (param: token_to_cash) (storage: storage) =
         (failwith error_PENDING_POOL_UPDATES_MUST_BE_ZERO : result)
     else if Tezos.now >= deadline then
         (failwith error_THE_CURRENT_TIME_MUST_BE_LESS_THAN_THE_DEADLINE : result)
-    else if Tezos.amount > 0mutez then
-        (failwith error_AMOUNT_MUST_BE_ZERO : result)
-    else
+    else begin
        
-        let cash_bought =
-            let bought = const_fee * (cashBought storage.cashPool storage.tokenPool tokensSold) / const_fee_denom in
-                if bought < minCashBought then (failwith error_CASH_BOUGHT_MUST_BE_GREATER_THAN_OR_EQUAL_TO_MIN_CASH_BOUGHT : nat) else bought in
-        let op_token = token_transfer storage Tezos.sender Tezos.self_address tokensSold in
-        let op_cash = cash_transfer storage Tezos.self_address  to_ cash_bought in
-        let new_cashPool = match is_nat (storage.cashPool - cash_bought) with
-            | None -> (failwith error_ASSERTION_VIOLATED_CASH_BOUGHT_SHOULD_BE_LESS_THAN_CASHPOOL : nat)
-            | Some n -> n in
-        let storage = {storage with tokenPool = storage.tokenPool + tokensSold ;
-                                    cashPool = new_cashPool} in
-        ([op_token; op_cash], storage)
+        let tokens_bought =
+            let cashSold = token_2_sold in
+            (let bought = const_fee * (tokensBought storage.cashPool storage.tokenPool cashSold) / const_fee_denom in
+            
+                bought)
+        in
+        let new_tokenPool = (match is_nat (storage.tokenPool - tokens_bought) with
+            | None -> (failwith error_TOKEN_POOL_MINUS_TOKENS_BOUGHT_IS_NEGATIVE : nat)
+            | Some difference -> difference) in
 
+        let cashSold = token_2_sold in 
+        let storage = { storage with cashPool = storage.cashPool + cashSold ; tokenPool = new_tokenPool } in
+      
+        let op_cash = cash_transfer storage Tezos.sender Tezos.self_address cashSold in
+      
+        let op_token = token_transfer storage Tezos.self_address to_ tokens_bought in
+        ([
+            op_cash;
+            op_token], storage)
+    end
+
+let token_2_to_3 (param: token_2_to_3) (storage: storage) =
+
+    let 
+    {
+        to_ = to_;
+        token_2_sold = token_2_sold;      
+        deadline = deadline;
+    } = param in
+
+    if storage.pendingPoolUpdates > 0n then
+        (failwith error_PENDING_POOL_UPDATES_MUST_BE_ZERO : result)
+    else if Tezos.now >= deadline then
+        (failwith error_THE_CURRENT_TIME_MUST_BE_LESS_THAN_THE_DEADLINE : result)
+    else begin
+       
+        let tokens_bought =
+            let cashSold = token_2_sold in
+            (let bought = const_fee * (tokensBought storage.cashPool storage.tokenPool cashSold) / const_fee_denom in
+            
+                bought)
+        in
+        let new_tokenPool = (match is_nat (storage.tokenPool - tokens_bought) with
+            | None -> (failwith error_TOKEN_POOL_MINUS_TOKENS_BOUGHT_IS_NEGATIVE : nat)
+            | Some difference -> difference) in
+
+        let cashSold = token_2_sold in 
+        let storage = { storage with cashPool = storage.cashPool + cashSold ; tokenPool = new_tokenPool } in
+      
+        let op_cash = cash_transfer storage Tezos.sender Tezos.self_address cashSold in
+      
+        let op_token = token_transfer storage Tezos.self_address to_ tokens_bought in
+        ([
+            op_cash;
+            op_token], storage)
+    end
+let token_3_to_2 (param: token_3_to_2) (storage: storage) =
+
+    let 
+    {
+        to_ = to_;
+        token_3_sold = token_3_sold;      
+        deadline = deadline;
+    } = param in
+
+    if storage.pendingPoolUpdates > 0n then
+        (failwith error_PENDING_POOL_UPDATES_MUST_BE_ZERO : result)
+    else if Tezos.now >= deadline then
+        (failwith error_THE_CURRENT_TIME_MUST_BE_LESS_THAN_THE_DEADLINE : result)
+    else begin
+       
+        let tokens_bought =
+            let cashSold = token_3_sold in
+            (let bought = const_fee * (tokensBought storage.cashPool storage.tokenPool cashSold) / const_fee_denom in
+            
+                bought)
+        in
+        let new_tokenPool = (match is_nat (storage.tokenPool - tokens_bought) with
+            | None -> (failwith error_TOKEN_POOL_MINUS_TOKENS_BOUGHT_IS_NEGATIVE : nat)
+            | Some difference -> difference) in
+
+        let cashSold = token_3_sold in 
+        let storage = { storage with cashPool = storage.cashPool + cashSold ; tokenPool = new_tokenPool } in
+      
+        let op_cash = cash_transfer storage Tezos.sender Tezos.self_address cashSold in
+      
+        let op_token = token_transfer storage Tezos.self_address to_ tokens_bought in
+        ([
+            op_cash;
+            op_token], storage)
+    end
+let token_1_to_3 (param: token_1_to_3) (storage: storage) =
+
+    let 
+    {
+        to_ = to_;
+        token_1_sold = token_1_sold;      
+        deadline = deadline;
+    } = param in
+
+    if storage.pendingPoolUpdates > 0n then
+        (failwith error_PENDING_POOL_UPDATES_MUST_BE_ZERO : result)
+    else if Tezos.now >= deadline then
+        (failwith error_THE_CURRENT_TIME_MUST_BE_LESS_THAN_THE_DEADLINE : result)
+    else begin
+       
+        let tokens_bought =
+            let cashSold = token_1_sold in
+            (let bought = const_fee * (tokensBought storage.cashPool storage.tokenPool cashSold) / const_fee_denom in
+            
+                bought)
+        in
+        let new_tokenPool = (match is_nat (storage.tokenPool - tokens_bought) with
+            | None -> (failwith error_TOKEN_POOL_MINUS_TOKENS_BOUGHT_IS_NEGATIVE : nat)
+            | Some difference -> difference) in
+
+        let cashSold = token_1_sold in 
+        let storage = { storage with cashPool = storage.cashPool + cashSold ; tokenPool = new_tokenPool } in
+      
+        let op_cash = cash_transfer storage Tezos.sender Tezos.self_address cashSold in
+      
+        let op_token = token_transfer storage Tezos.self_address to_ tokens_bought in
+        ([
+            op_cash;
+            op_token], storage)
+    end
+let token_3_to_1 (param: token_3_to_1) (storage: storage) =
+
+    let 
+    {
+        to_ = to_;
+        token_3_sold = token_3_sold;      
+        deadline = deadline;
+    } = param in
+
+    if storage.pendingPoolUpdates > 0n then
+        (failwith error_PENDING_POOL_UPDATES_MUST_BE_ZERO : result)
+    else if Tezos.now >= deadline then
+        (failwith error_THE_CURRENT_TIME_MUST_BE_LESS_THAN_THE_DEADLINE : result)
+    else begin
+       
+        let tokens_bought =
+            let cashSold = token_3_sold in
+            (let bought = const_fee * (tokensBought storage.cashPool storage.tokenPool cashSold) / const_fee_denom in
+            
+                bought)
+        in
+        let new_tokenPool = (match is_nat (storage.tokenPool - tokens_bought) with
+            | None -> (failwith error_TOKEN_POOL_MINUS_TOKENS_BOUGHT_IS_NEGATIVE : nat)
+            | Some difference -> difference) in
+
+        let cashSold = token_3_sold in 
+        let storage = { storage with cashPool = storage.cashPool + cashSold ; tokenPool = new_tokenPool } in
+      
+        let op_cash = cash_transfer storage Tezos.sender Tezos.self_address cashSold in
+      
+        let op_token = token_transfer storage Tezos.self_address to_ tokens_bought in
+        ([
+            op_cash;
+            op_token], storage)
+    end
 
 let default_ () : result = 
     (failwith error_TEZ_DEPOSIT_WOULD_BE_BURNED : result)
@@ -486,15 +672,24 @@ let main ((entrypoint, storage) : entrypoint * storage) : result =
         add_liquidity param storage
     | RemoveLiquidity param ->
         remove_liquidity param storage
+    | Token1to2 param ->
+        token_1_to_2 param storage
+    | Token2to1 param ->
+        token_2_to_1 param storage
+    | Token2to3 param ->
+        token_2_to_3 param storage
+    | Token3to2 param ->
+        token_3_to_2 param storage
+    | Token1to3 param ->
+        token_1_to_3 param storage
+    | Token3to1 param ->
+        token_3_to_1 param storage
     | UpdateCashPoolInternal cash_pool ->
         update_cash_pool_internal cash_pool storage
     | UpdatePools  ->
         update_pools storage
-    | CashToToken param ->
-        (cash_to_token param storage)
-    | TokenToCash param ->
-        (token_to_cash param storage)
     | UpdateTokenPoolInternal token_pool ->
         update_token_pool_internal token_pool storage
     | SetLiqAddress param ->
         set_liq_address param storage
+    
